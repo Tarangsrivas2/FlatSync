@@ -1,114 +1,161 @@
-# FlatSync-Project
+# FlatSync
 
-A Full-Stack Web App that helps Students and Professionals Find Compatible Flatmates using AI-based Lifestyle Matching, in-app messaging, and map-based listings.
+A full-stack MERN app that helps students and professionals find compatible flatmates using AI-based lifestyle matching, real-time in-app messaging, and map-based flat listings.
 
-## Nearby flat discovery
+## Features
 
-Flat seekers can choose a search radius of 1, 3, 5, 10, 20, or 50 km from either their current location or a searched place. The app:
-
-- filters results on the server using MongoDB's geospatial index, so only flats inside the selected radius are returned;
-- shows the approximate distance to each flat in the list and detail view; and
-- draws the active search area on the map.
-
-Flat owners continue to post a vacancy through **My Flat Listings**; people searching within their chosen area can then send them a flatmate request.
-
-The nearby search endpoint accepts `GET /api/listings?lat=<latitude>&lng=<longitude>&radiusKm=<1-50>`.
-
-# FlatSync — AI-Powered Flatmate Finder
+- **Lifestyle onboarding** — a 10-question lifestyle survey (food preference, sleep schedule, cleanliness, etc.) used to calculate compatibility between users
+- **AI compatibility scoring** — match scores generated via the Gemini API
+- **Map-based flat discovery** — search and pin locations using Leaflet + OpenStreetMap (free, no API key required)
+- **Geospatial radius search** — find flats within a chosen radius (1–50 km) using MongoDB's geospatial queries (`$geoNear` / `$geoWithin`)
+- **Real-time messaging** — in-app chat powered by Socket.io
+- **Photo uploads** — flat listing photos stored via Cloudinary
+- **JWT authentication** — password hashing with bcrypt
 
 ## Folder Structure
 
 ```
-FlatSync/
-├── backend/                  ← Node.js + Express API
-│   ├── controllers/          ← Business logic functions
+FlatSync-Project/
+├── server/                     ← Node.js + Express API
+│   ├── config/
+│   │   ├── db.js               ← MongoDB connection
+│   │   └── cloudinary.js       ← Cloudinary config
+│   ├── controllers/
 │   │   ├── authController.js
-│   │   ├── listingsController.js
-│   │   └── contactController.js
-│   ├── middleware/           ← JWT auth protection
-│   │   └── authMiddleware.js
-│   ├── models/               ← MongoDB schemas
-│   │   ├── User.js
-│   │   └── Listing.js
-│   ├── routes/               ← API route definitions
-│   │   ├── auth.js
-│   │   ├── listings.js
-│   │   └── contact.js
-│   ├── .env.example          ← Copy this to .env and fill values
-│   ├── package.json
-│   └── server.js             ← Entry point
+│   │   ├── listingController.js
+│   │   ├── matchController.js
+│   │   ├── messageController.js
+│   │   ├── requestController.js
+│   │   └── userController.js
+│   ├── middlewares/
+│   │   ├── authMiddleware.js   ← JWT auth protection (`protect`)
+│   │   └── upload.js           ← Multer file upload handling
+│   ├── models/
+│   │   ├── Listing.js
+│   │   ├── MatchScore.js
+│   │   ├── Message.js
+│   │   ├── Request.js
+│   │   └── User.js
+│   ├── routes/
+│   │   ├── authRoutes.js
+│   │   ├── listingRoutes.js
+│   │   ├── matchRoutes.js
+│   │   ├── messageRoutes.js
+│   │   ├── requestRoutes.js
+│   │   └── userRoutes.js
+│   ├── services/
+│   │   └── geminiService.js    ← AI compatibility scoring
+│   ├── utils/
+│   │   └── cloudinaryUpload.js
+│   ├── seedData.js
+│   ├── socket.js               ← Socket.io setup
+│   ├── server.js                ← Entry point
+│   └── .env                    ← Environment variables (see below)
 │
-└── frontend/                 ← React app
+└── client/                     ← React app (Vite)
     ├── src/
-    │   ├── components/       ← Reusable components
-    │   │   ├── Navbar.jsx
-    │   │   ├── PageHeader.jsx
-    │   │   ├── FlatmateCard.jsx
-    │   │   └── MatchBadge.jsx
-    │   ├── context/          ← Global state
-    │   │   └── AuthContext.jsx
-    │   ├── pages/            ← One file per page/route
+    │   ├── components/
+    │   │   ├── MatchScoreBadge.jsx
+    │   │   └── LeafletMapHelpers.jsx   ← Shared map recenter/click helpers
+    │   ├── context/
+    │   │   ├── AuthContext.jsx
+    │   │   └── SocketContext.jsx
+    │   ├── pages/
     │   │   ├── Home.jsx
-    │   │   ├── FindFlatmate.jsx
-    │   │   ├── About.jsx
-    │   │   ├── Login.jsx
-    │   │   └── Register.jsx
+    │   │   ├── Onboarding.jsx          ← Lifestyle survey + Leaflet location pinning
+    │   │   ├── FindFlat.jsx            ← Browse / Matches / Map views
+    │   │   └── ... (Login, Register, etc.)
+    │   ├── utils/
+    │   │   ├── axiosInstance.js        ← Configured Axios instance (baseURL from VITE_API_URL)
+    │   │   └── compatibility.js        ← Client-side compatibility scoring helper
+    │   ├── leafletConfig.js            ← Fixes Leaflet's default marker icon in bundled builds
     │   ├── App.jsx
-    │   ├── main.jsx
-    │   └── index.css
-    └── package.json
+    │   └── main.jsx
+    └── .env                             ← Environment variables (see below)
 ```
-
----
 
 ## How to Run
 
-### Step 1 — Setup Backend
+### Step 1 — Set up the backend
 
 ```bash
-cd backend
+cd server
 npm install
-
-# Create your .env file
-cp .env.example .env
-# Open .env and fill in your MONGO_URI and JWT_SECRET
-
-npm run dev     # starts backend on http://localhost:5000
 ```
 
-### Step 2 — Setup Frontend
+Create a `.env` file in `server/` with:
+
+```
+MONGO_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<dbname>?appName=Cluster0
+JWT_SECRET=your_jwt_secret
+PORT=5001
+
+# Required for flat-photo uploads
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+
+# Optional: enables AI compatibility scores
+GEMINI_API_KEY=your_gemini_api_key
+```
 
 ```bash
-cd frontend
+npm run dev     # starts backend on http://localhost:5001
+```
+
+### Step 2 — Set up the frontend
+
+```bash
+cd client
 npm install
+```
+
+Create a `.env` file in `client/` with:
+
+```
+VITE_API_URL=http://localhost:5001/api
+```
+
+```bash
 npm run dev     # starts frontend on http://localhost:5173
 ```
 
-### Step 3 — Make sure MongoDB is running
-- If using local MongoDB: make sure `mongod` is running
-- If using MongoDB Atlas: paste your Atlas connection string in .env
+### Step 3 — MongoDB Atlas setup
 
----
+- Whitelist your IP under **Network Access** in your Atlas project
+- Make sure your database user has `readWrite` permissions
+- No local MongoDB required if using Atlas
 
 ## API Endpoints
 
-| Method | URL                      | Protected | Description              |
-|--------|--------------------------|-----------|--------------------------|
-| POST   | /api/auth/register       | No        | Create new account       |
-| POST   | /api/auth/login          | No        | Login, get JWT token     |
-| GET    | /api/auth/profile        | Yes       | Get logged-in user info  |
-| GET    | /api/listings            | No        | Get all listings         |
-| POST   | /api/listings            | Yes       | Post a new listing       |
-| DELETE | /api/listings/:id        | Yes       | Delete your listing      |
-| POST   | /api/contact             | No        | Submit contact form      |
+**Confirmed in this codebase:**
 
----
+| Method | URL                          | Protected | Description                                  |
+|--------|------------------------------|-----------|-----------------------------------------------|
+| POST   | /api/auth/register           | No        | Create new account                           |
+| POST   | /api/auth/login              | No        | Login, get JWT token                         |
+| POST   | /api/auth/onboarding         | Yes       | Submit lifestyle survey + address            |
+| GET    | /api/listings                | No        | Get all listings (or nearby, with query params) |
+| POST   | /api/listings                | Yes       | Create a new flat listing (with photos)      |
+| GET    | /api/listings/my-listings    | Yes       | Get listings owned by the logged-in user     |
+| GET    | /api/listings/:id            | Yes       | Get a single listing                         |
+| PUT    | /api/listings/:id            | Yes       | Update a listing                             |
+| DELETE | /api/listings/:id            | Yes       | Delete a listing                             |
+| POST   | /api/listings/search-area    | No        | Search listings within a polygon boundary (`$geoWithin`) |
+| POST   | /api/requests/send           | Yes       | Send a flatmate request for a listing        |
+| GET    | /api/requests/outgoing       | Yes       | Get requests sent by the logged-in user      |
+
+**Not yet documented here** — `/api/requests` (remaining endpoints), `/api/messages`, `/api/users`, `/api/match`: these exist in the routes folder but their exact paths weren't confirmed in this conversation. Paste the contents of `requestRoutes.js`, `messageRoutes.js`, `userRoutes.js`, and `matchRoutes.js` if you'd like this table completed accurately rather than guessed.
+
+**Nearby flat discovery details:**
+Flat seekers can choose a search radius of 1, 3, 5, 10, 20, or 50 km from either their current location or a searched place. Results are filtered server-side using MongoDB's geospatial index, so only flats inside the selected radius are returned. The frontend shows the approximate distance to each flat and draws the active search radius on the map.
 
 ## Tech Stack
-- **Frontend:** React.js, React Router, Axios, Context API
-- **Backend:** Node.js, Express.js
-- **Database:** MongoDB + Mongoose
-- **Auth:** JWT (JSON Web Tokens) + bcryptjs
 
-## Team
-2 members working on separate GitHub feature branches.
+- **Frontend:** React (Vite), React Router, Axios, Context API, Leaflet / react-leaflet, GSAP, Tailwind CSS, Socket.io Client
+- **Backend:** Node.js, Express, Socket.io
+- **Database:** MongoDB + Mongoose (geospatial indexing)
+- **Auth:** JWT + bcrypt
+- **File Storage:** Cloudinary
+- **AI:** Google Gemini API (compatibility scoring)
+- **Maps:** Leaflet + OpenStreetMap tiles, Nominatim (free geocoding — no API key required)
